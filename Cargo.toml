@@ -1,0 +1,7 @@
+[package]
+name = "RSON"
+version = "0.1.0"
+authors = ["Mateusz Ryczek <mateusz@northwestern.edu>"]
+
+[dependencies]
+hyper = "0.11"
