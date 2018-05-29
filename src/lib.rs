@@ -12,6 +12,8 @@ use hyper::{Body, Chunk, Method, StatusCode, header::ContentLength,
 use serde_json::{Error, Value};
 use std::collections::HashMap;
 use url::form_urlencoded;
+use std::fs::File;
+use std::io::prelude::*;
 
 const GET_RESPONSE: &'static str = "This server expects POST requests to /";
 static MISSING: &[u8] = b"Missing field";
@@ -19,7 +21,9 @@ const NUM_THREADS: usize = 4;
 
 pub struct SimpleRespond;
 
-
+pub struct Mappings{
+    transform: HashMap<String, String>,
+}
 
 impl Service for SimpleRespond {
     // boilerplate hooking up hyper's server types
@@ -66,4 +70,15 @@ impl Service for SimpleRespond {
     }
 }
 
-fn load_file() {}
+fn load_file() {
+    let mut f = File::open("mappings.json").expect("file not found");
+
+    let mut contents = String::new();
+    f.read_to_string(&mut contents)
+        .expect("something went wrong reading the file");
+
+    let json: Value = serde_json::from_str(&contents).unwrap();
+
+    println!("URL for some_id is {}", json["some_id"]);
+}
+
