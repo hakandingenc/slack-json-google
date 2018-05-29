@@ -19,6 +19,8 @@ const NUM_THREADS: usize = 4;
 
 pub struct SimpleRespond;
 
+
+
 impl Service for SimpleRespond {
     // boilerplate hooking up hyper's server types
     type Request = Request;
@@ -49,7 +51,7 @@ impl Service for SimpleRespond {
                             .with_header(ContentLength(MISSING.len() as u64))
                             .with_body(MISSING);
                     };
-                    let body = format!("The callback_id", res_url["callback_id"]);
+                    let body = format!("The callback_id is {}", res_url["callback_id"]);
                     Response::new()
                         .with_header(ContentLength(body.len() as u64))
                         .with_body(body)
