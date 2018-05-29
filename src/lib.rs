@@ -11,9 +11,9 @@ use hyper::{Body, Chunk, Method, StatusCode, header::ContentLength,
             server::{Http, Request, Response, Service}};
 use serde_json::{Error, Value};
 use std::collections::HashMap;
-use url::form_urlencoded;
 use std::fs::File;
 use std::io::prelude::*;
+use url::form_urlencoded;
 
 const GET_RESPONSE: &'static str = "This server expects POST requests to /";
 static MISSING: &[u8] = b"Missing field";
@@ -21,7 +21,7 @@ const NUM_THREADS: usize = 4;
 
 pub struct SimpleRespond;
 
-pub struct Mappings{
+pub struct Mappings {
     transform: HashMap<String, String>,
 }
 
@@ -55,7 +55,11 @@ impl Service for SimpleRespond {
                             .with_header(ContentLength(MISSING.len() as u64))
                             .with_body(MISSING);
                     };
-                    let body = format!("The callback_id is {}", res_url["callback_id"]);
+                    let body = format!(
+                        "The mapping for {} is {}\n",
+                        &res_url["callback_id"],
+                        resolve_callback(&res_url["callback_id"])
+                    );
                     Response::new()
                         .with_header(ContentLength(body.len() as u64))
                         .with_body(body)
@@ -70,7 +74,7 @@ impl Service for SimpleRespond {
     }
 }
 
-fn load_file() {
+fn resolve_callback(id: &serde_json::Value) -> serde_json::Value {
     let mut f = File::open("mappings.json").expect("file not found");
 
     let mut contents = String::new();
@@ -78,7 +82,5 @@ fn load_file() {
         .expect("something went wrong reading the file");
 
     let json: Value = serde_json::from_str(&contents).unwrap();
-
-    println!("URL for some_id is {}", json["some_id"]);
+    json[id.as_str().unwrap()].clone()
 }
-
