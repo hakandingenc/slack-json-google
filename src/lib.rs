@@ -7,9 +7,9 @@ extern crate tokio_core;
 extern crate url;
 
 use futures::{Stream, future::Future};
-use hyper::{Body, Chunk, Method, StatusCode, header::ContentLength,
+use hyper::{Body, Chunk, Error, Method, StatusCode, header::ContentLength,
             server::{Http, Request, Response, Service}};
-use serde_json::{Error, Value};
+use serde_json::{Error as SerdeError, Value};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
@@ -27,11 +27,13 @@ const GET_RESPONSE: &'static str = "This server expects POST requests to /";
 static MISSING: &[u8] = b"Missing field";
 const NUM_THREADS: usize = 4;
 
-pub struct SimpleRespond;
+pub struct SimpleRespond(pub tokio_core::reactor::Handle);
 
 pub struct Mappings {
     transform: HashMap<String, String>,
 }
+// For extra client
+pub type ResponseStream = Box<Stream<Item = Chunk, Error = Error>>;
 
 impl Service for SimpleRespond {
     // boilerplate hooking up hyper's server types
@@ -41,14 +43,17 @@ impl Service for SimpleRespond {
     // The future representing the eventual Response your call will
     // resolve to. This can change to whatever Future you need.
     type Future = Box<Future<Item = Self::Response, Error = Self::Error>>;
-    type Response = Response;
+    // For extra client
+    //Before: type Response = Response;
+    type Response = Response<ResponseStream>;
 
     fn call(&self, req: Request) -> Self::Future {
         let mut response = Response::new();
 
         match (req.method(), req.path()) {
             (&Method::Get, "/") => {
-                response.set_body(GET_RESPONSE);
+                let body: ResponseStream = Box::new(hyper::Body::from(GET_RESPONSE));
+                response.set_body(body);
             }
             (&Method::Post, "/") => {
                 return Box::new(req.body().concat2().map(|b| {
@@ -58,21 +63,29 @@ impl Service for SimpleRespond {
                     let res_url: Value = if let Some(n) = params.get("payload") {
                         serde_json::from_str(n).unwrap()
                     } else {
+                        let body: ResponseStream = Box::new(hyper::Body::from(GET_RESPONSE));
+
                         return Response::new()
                             .with_status(StatusCode::UnprocessableEntity)
                             .with_header(ContentLength(MISSING.len() as u64))
-                            .with_body(MISSING);
+                            .with_body(body);
                     };
                     // Use the client in some way
-                    send_via_client();
+                    let client = Client::configure().build(&self.0);
+                    let mut req2 = Request::new(Method::Get, "localhost/".parse().unwrap());
+                    req2.set_body("ABC");
+                    let web_res_future = client.request(req2);
+
                     // Continue with the server
                     let body = format!(
                         "The mapping for {} is {}\n",
                         &res_url["callback_id"],
                         resolve_callback(&res_url["callback_id"])
                     );
+                    let len = body.len();
+                    let body: ResponseStream = Box::new(hyper::Body::from(body));
                     Response::new()
-                        .with_header(ContentLength(body.len() as u64))
+                        .with_header(ContentLength(len as u64))
                         .with_body(body)
                 }));
             }
@@ -94,22 +107,4 @@ fn resolve_callback(id: &serde_json::Value) -> serde_json::Value {
 
     let json: Value = serde_json::from_str(&contents).unwrap();
     json[id.as_str().unwrap()].clone()
-}
-
-fn send_via_client() {
-    let mut core = Core::new().unwrap();
-    let client = Client::new(&core.handle());
-
-    let json = r#"{"library":"hyper"}"#;
-    let uri = "http://httpbin.org/post".parse().unwrap();
-    let mut req = Request::new(Method::Post, uri);
-    req.headers_mut().set(ContentType::json());
-    req.headers_mut().set(ContentLength(json.len() as u64));
-    req.set_body(json);
-    let post = client.request(req).and_then(|res| {
-        println!("POST: {}", res.status());
-
-        res.body().concat2()
-    });
-    core.run(post).unwrap();
 }
