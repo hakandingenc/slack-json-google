@@ -61,7 +61,7 @@ impl Service for SimpleRespond {
                 response.set_body(body);
             }
             (&Method::Post, "/") => {
-                return Box::new(req.body().concat2().map(|b| {
+                return Box::new(req.body().concat2().map(move |b| {
                     let params = form_urlencoded::parse(b.as_ref())
                         .into_owned()
                         .collect::<HashMap<String, String>>();
