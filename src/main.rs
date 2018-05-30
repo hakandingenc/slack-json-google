@@ -18,6 +18,7 @@ use hyper::server::{Http, Request, Response, Service};
 use hyper::{Body, Chunk, Client, Get, Post, StatusCode};
 extern crate rson;
 use rson::*;
+pub mod test;
 
 fn main() {
     let addr = "127.0.0.1:3000".parse().unwrap();

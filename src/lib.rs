@@ -15,6 +15,11 @@ use std::fs::File;
 use std::io::prelude::*;
 use url::form_urlencoded;
 
+// For deriving serde macros
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+
 // For Client
 //use futures::Future;
 use hyper::Client;
@@ -71,10 +76,18 @@ impl Service for SimpleRespond {
                             .with_body(body);
                     };
                     // Use the client in some way
-                    let client = Client::configure().build(&self.0);
-                    let mut req2 = Request::new(Method::Get, "localhost/".parse().unwrap());
-                    req2.set_body("ABC");
-                    let web_res_future = client.request(req2);
+                    let client = Client::new(&self.0);
+                    //let client = Client::configure().build(&self.0);
+                    //let mut req2 = Request::new(Method::Get, "localhost/".parse().unwrap());
+                    //req2.set_body("ABC");
+                    let uri = "http://httpbin.org/ip".parse().unwrap();
+                    let work = client.get(uri).and_then(|res| {
+                        println!("Response: {}", res.status());
+
+                        res.body()
+                            .for_each(|chunk| io::stdout().write_all(&chunk).map_err(From::from))
+                    });
+                    &self.0.spawn(work.map_err(|_| ()));
 
                     // Continue with the server
                     let body = format!(
@@ -107,4 +120,23 @@ fn resolve_callback(id: &serde_json::Value) -> serde_json::Value {
 
     let json: Value = serde_json::from_str(&contents).unwrap();
     json[id.as_str().unwrap()].clone()
+}
+
+#[derive(Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Dictionary {
+    mappings: HashMap<String, String>,
+}
+
+impl Dictionary {
+    pub fn new_from_file(path: &str) -> io::Result<Self> {
+        let mut f = File::open(path)?;
+        let mut contents = String::new();
+        f.read_to_string(&mut contents)?;
+        let mappings: HashMap<String, String> = serde_json::from_str(contents.as_ref())?;
+        println!("{:?}", mappings);
+        Ok(Dictionary { mappings })
+    }
+    pub fn resolve_callback(&self, id: &str) -> Option<&String> {
+        self.mappings.get(id)
+    }
 }

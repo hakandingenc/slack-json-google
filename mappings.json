@@ -1,1 +1,5 @@
-{"some_id":"https://google.com"}
+{
+  "some_id": "https://google.com",
+  "another_id": "https://facebook.com",
+  "nyan" : "http://www.nyan.cat/"
+}
