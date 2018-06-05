@@ -61,6 +61,7 @@ impl Service for SimpleRespond {
                 response.set_body(body);
             }
             (&Method::Post, "/") => {
+                let handle = self.0.clone();
                 return Box::new(req.body().concat2().map(move |b| {
                     let params = form_urlencoded::parse(b.as_ref())
                         .into_owned()
@@ -76,18 +77,30 @@ impl Service for SimpleRespond {
                             .with_body(body);
                     };
                     // Use the client in some way
-                    let client = Client::new(&self.0);
+                    //let client = Client::new(&handle);
+                    let client = ::hyper::Client::configure()
+                        .connector(::hyper_tls::HttpsConnector::new(4, &handle).unwrap())
+                        .build(&handle);
                     //let client = Client::configure().build(&self.0);
                     //let mut req2 = Request::new(Method::Get, "localhost/".parse().unwrap());
                     //req2.set_body("ABC");
-                    let uri = "http://httpbin.org/ip".parse().unwrap();
-                    let work = client.get(uri).and_then(|res| {
+                    //let uri = "http://httpbin.org/ip".parse().unwrap();
+                    let uri = "https://script.google.com/macros/s/AKfycbzqs6D4QA8L2x2k9B3_UrgSU1Vcqj0icHiIs26G0IbTYaBNy8xW/exec".parse().unwrap();
+                    let mut request = Request::new(Method::Post, uri);
+                    request.set_body(Body::from("payload=Hello%20world"));
+                    {
+                        let mut headers = request.headers_mut();
+                        headers.set_raw("Content-Type", "application/x-www-form-urlencoded");
+                        headers.set_raw("Accept", "*/*");
+                        headers.set_raw("User-Agent", "Rust");
+                    }
+                    let work = client.request(request).and_then(|res| {
                         println!("Response: {}", res.status());
 
                         res.body()
                             .for_each(|chunk| io::stdout().write_all(&chunk).map_err(From::from))
                     });
-                    &self.0.spawn(work.map_err(|_| ()));
+                    &handle.spawn(work.map_err(|_| ()));
 
                     // Continue with the server
                     let body = format!(
