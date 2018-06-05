@@ -10,6 +10,10 @@ mod tests {
             dict.resolve_callback("some_id"),
             Some(&"https://google.com".to_string())
         );
+        assert_eq!(
+            dict.resolve_callback("nyan"),
+            Some(&"http://www.nyan.cat/".to_string())
+        );
     }
 
     #[test]
