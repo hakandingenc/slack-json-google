@@ -1,4 +1,3 @@
-#![allow(dead_code, unused_imports)]
 extern crate futures;
 extern crate hyper;
 extern crate hyper_tls;
@@ -8,7 +7,7 @@ extern crate url;
 
 use futures::{Stream, future::Future};
 use hyper::{Body, Chunk, Error, Method, StatusCode, header::ContentLength,
-            server::{Http, Request, Response, Service}};
+            server::{Request, Response, Service}};
 use serde_json::{Error as SerdeError, Value};
 use std::collections::HashMap;
 use std::fs::File;
@@ -22,11 +21,8 @@ extern crate serde_derive;
 
 // For Client
 //use futures::Future;
-use hyper::Client;
 //use hyper::Request;
-use hyper::header::ContentType;
 use std::io::{self, Write};
-use tokio_core::reactor::Core;
 
 const GET_RESPONSE: &'static str = "This server expects POST requests to /";
 static MISSING: &[u8] = b"Missing field";

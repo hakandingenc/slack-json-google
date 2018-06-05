@@ -1,22 +1,12 @@
-// extern crate futures;
-// extern crate hyper;
-// extern crate rson;
-// extern crate tokio_core;
-// use hyper::server::Http;
-// use rson::*;
-
 extern crate futures;
 extern crate hyper;
 extern crate pretty_env_logger;
+extern crate rson;
 extern crate tokio_core;
 
 use futures::{Future, Stream};
+use hyper::server::Http;
 
-use hyper::error::Error;
-use hyper::header::ContentLength;
-use hyper::server::{Http, Request, Response, Service};
-use hyper::{Body, Chunk, Client, Get, Post, StatusCode};
-extern crate rson;
 use rson::*;
 pub mod test;
 
