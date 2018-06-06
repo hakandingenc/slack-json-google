@@ -20,24 +20,15 @@ const GET_RESPONSE: &'static str = "This server expects POST requests to /";
 static MISSING: &[u8] = b"Missing field";
 const NUM_THREADS: usize = 4;
 
-pub struct SimpleRespond(pub tokio_core::reactor::Handle);
+pub struct SimpleRespond(tokio_core::reactor::Handle, Dictionary);
 
-pub struct Mappings {
-    transform: HashMap<String, String>,
-}
 // For extra client
 pub type ResponseStream = Box<Stream<Item = Chunk, Error = Error>>;
 
 impl Service for SimpleRespond {
-    // boilerplate hooking up hyper's server types
     type Request = Request;
-    //type Response = Response;
     type Error = hyper::Error;
-    // The future representing the eventual Response your call will
-    // resolve to. This can change to whatever Future you need.
     type Future = Box<Future<Item = Self::Response, Error = Self::Error>>;
-    // For extra client
-    //Before: type Response = Response;
     type Response = Response<ResponseStream>;
 
     fn call(&self, req: Request) -> Self::Future {
@@ -126,7 +117,7 @@ pub struct Dictionary {
 }
 
 impl Dictionary {
-    pub fn new_from_file(path: &str) -> io::Result<Self> {
+    pub fn new_from_file(path: &Path) -> io::Result<Self> {
         let mut mapfile = OpenOptions::new()
             .read(true)
             .append(true)
@@ -146,13 +137,13 @@ impl Dictionary {
 }
 
 pub fn start_server(addr: std::net::SocketAddr, dict_file: &Path) -> hyper::Result<()> {
-    //initialize_dictionary();
+    let dictionary = Dictionary::new_from_file(dict_file).unwrap();
 
     let mut core = tokio_core::reactor::Core::new()?;
     let server_handle = core.handle();
     let client_handle = core.handle();
     let serve = Http::new().serve_addr_handle(&addr, &server_handle, move || {
-        Ok(SimpleRespond(client_handle.clone()))
+        Ok(SimpleRespond(client_handle.clone(), dictionary))
     })?;
 
     println!(
@@ -177,8 +168,4 @@ pub fn start_server(addr: std::net::SocketAddr, dict_file: &Path) -> hyper::Resu
 fn print_carets() -> io::Result<()> {
     print!(">>> ");
     io::stdout().flush()
-}
-
-fn initialize_dictionary() {
-    unimplemented!()
 }
