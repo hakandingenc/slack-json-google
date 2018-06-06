@@ -13,7 +13,8 @@ use futures::{Stream, future::Future};
 use hyper::{Body, Chunk, Error, Method, StatusCode, header::ContentLength,
             server::{Http, Request, Response, Service}};
 use serde_json::{Error as SerdeError, Value};
-use std::{collections::HashMap, fs::{File, OpenOptions}, io::{self, prelude::*}, path::Path};
+use std::{collections::HashMap, fs::{File, OpenOptions}, io::{self, prelude::*}, path::Path,
+          sync::Arc};
 use url::form_urlencoded;
 
 const GET_RESPONSE: &'static str = "This server expects POST requests to /";
@@ -41,6 +42,7 @@ impl Service for SimpleRespond {
             }
             (&Method::Post, "/") => {
                 let handle = self.0.clone();
+                let dict = self.1.clone();
                 return Box::new(req.body().concat2().map(move |b| {
                     let params = form_urlencoded::parse(b.as_ref())
                         .into_owned()
@@ -58,7 +60,15 @@ impl Service for SimpleRespond {
                     let client = ::hyper::Client::configure()
                         .connector(::hyper_tls::HttpsConnector::new(4, &handle).unwrap())
                         .build(&handle);
-                    let uri = "https://script.google.com/macros/s/AKfycbzqs6D4QA8L2x2k9B3_UrgSU1Vcqj0icHiIs26G0IbTYaBNy8xW/exec".parse().unwrap();
+                    // let cloned_dict = Dictionary {
+                    //     mappings: self.1.mappings.clone(),
+                    // };
+                    println!("Self.1.mappings: {:?}", dict);
+                    let uri = dict.resolve_callback(&res_url["callback_id"].as_str().unwrap())
+                        .unwrap()
+                        .parse()
+                        .unwrap();
+                    //let uri = "https://script.google.com/macros/s/AKfycbzqs6D4QA8L2x2k9B3_UrgSU1Vcqj0icHiIs26G0IbTYaBNy8xW/exec".parse().unwrap();
                     let mut request = Request::new(Method::Post, uri);
                     request.set_body(Body::from("payload=Hello%20world"));
                     {
@@ -76,11 +86,7 @@ impl Service for SimpleRespond {
                     &handle.spawn(work.map_err(|_| ()));
 
                     // Continue with the server
-                    let body = format!(
-                        "The mapping for {} is {}\n",
-                        &res_url["callback_id"],
-                        resolve_callback(&res_url["callback_id"])
-                    );
+                    let body = "Your request has been received";
                     let len = body.len();
                     let body: ResponseStream = Box::new(hyper::Body::from(body));
                     Response::new()
@@ -111,9 +117,9 @@ fn resolve_callback(mut id: &serde_json::Value) -> serde_json::Value {
     json[id.as_str().unwrap()].clone()
 }
 
-#[derive(Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Default, Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub struct Dictionary {
-    mappings: HashMap<String, String>,
+    mappings: Arc<HashMap<String, String>>,
 }
 
 impl Dictionary {
@@ -129,7 +135,9 @@ impl Dictionary {
             serde_json::from_reader(mapfile).expect("Couldn't read file into JSON Object!");
 
         println!("{:?}", mappings);
-        Ok(Dictionary { mappings })
+        Ok(Dictionary {
+            mappings: Arc::new(mappings),
+        })
     }
     pub fn resolve_callback(&self, id: &str) -> Option<&String> {
         self.mappings.get(id)
@@ -143,7 +151,12 @@ pub fn start_server(addr: std::net::SocketAddr, dict_file: &Path) -> hyper::Resu
     let server_handle = core.handle();
     let client_handle = core.handle();
     let serve = Http::new().serve_addr_handle(&addr, &server_handle, move || {
-        Ok(SimpleRespond(client_handle.clone(), dictionary))
+        Ok(SimpleRespond(
+            client_handle.clone(),
+            Dictionary {
+                mappings: dictionary.mappings.clone(),
+            },
+        ))
     })?;
 
     println!(
