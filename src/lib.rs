@@ -1,31 +1,20 @@
 extern crate futures;
 extern crate hyper;
 extern crate hyper_tls;
+extern crate serde;
 extern crate serde_json;
 extern crate tokio_core;
 extern crate url;
 
-use futures::{Stream, future::Future};
-use hyper::{Body, Chunk, Error, Method, StatusCode, header::ContentLength,
-            server::{Request, Response, Service}};
-use std::{collections::HashMap, fs::{File,OpenOptions}, io::prelude::*, path::Path};
-use serde_json::{Error as SerdeError, Value};
-use std::io::prelude::*;
-use url::form_urlencoded;
-
-use hyper::server::Http;
-
-//use std::env;
-
-// For deriving serde macros
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
-// For Client
-//use futures::Future;
-//use hyper::Request;
-use std::io::{self, Write};
+use futures::{Stream, future::Future};
+use hyper::{Body, Chunk, Error, Method, StatusCode, header::ContentLength,
+            server::{Http, Request, Response, Service}};
+use serde_json::{Error as SerdeError, Value};
+use std::{collections::HashMap, fs::{File, OpenOptions}, io::{self, prelude::*}, path::Path};
+use url::form_urlencoded;
 
 const GET_RESPONSE: &'static str = "This server expects POST requests to /";
 static MISSING: &[u8] = b"Missing field";
@@ -53,7 +42,6 @@ impl Service for SimpleRespond {
 
     fn call(&self, req: Request) -> Self::Future {
         let mut response = Response::new();
-
 
         match (req.method(), req.path()) {
             (&Method::Get, "/") => {
@@ -126,8 +114,8 @@ fn resolve_callback(mut id: &serde_json::Value) -> serde_json::Value {
         .open("mappings.json")
         .expect("Mappings file IO error!");
 
-    let json: Value = serde_json::from_reader(mapfile)
-        .expect("Couldn't read file into JSON Object!");
+    let json: Value =
+        serde_json::from_reader(mapfile).expect("Couldn't read file into JSON Object!");
 
     json[id.as_str().unwrap()].clone()
 }
@@ -146,8 +134,8 @@ impl Dictionary {
             .open(path)
             .expect("Mapfile IO error!");
 
-        let mappings: HashMap<String, String> = serde_json::from_reader(mapfile)
-            .expect("Couldn't read file into JSON Object!");
+        let mappings: HashMap<String, String> =
+            serde_json::from_reader(mapfile).expect("Couldn't read file into JSON Object!");
 
         println!("{:?}", mappings);
         Ok(Dictionary { mappings })
