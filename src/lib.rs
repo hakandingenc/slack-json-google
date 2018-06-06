@@ -17,11 +17,14 @@ use std::{collections::HashMap, fs::{File, OpenOptions}, io::{self, prelude::*},
           sync::Arc};
 use url::form_urlencoded;
 
+//pub mod main;
+//use main::response_to_slack;
+
 const GET_RESPONSE: &'static str = "This server expects POST requests to /";
 static MISSING: &[u8] = b"Missing field";
 const NUM_THREADS: usize = 4;
 
-pub struct SimpleRespond(tokio_core::reactor::Handle, Dictionary);
+pub struct SimpleRespond(tokio_core::reactor::Handle, Dictionary, String);
 
 // For extra client
 pub type ResponseStream = Box<Stream<Item = Chunk, Error = Error>>;
@@ -39,6 +42,7 @@ impl Service for SimpleRespond {
             &Method::Post => {
                 let handle = self.0.clone();
                 let dict = self.1.clone();
+                let response_to_slack = self.2.clone();
                 return Box::new(req.body().concat2().map(move |b| {
                     let params = form_urlencoded::parse(b.as_ref())
                         .into_owned()
@@ -57,22 +61,16 @@ impl Service for SimpleRespond {
                     let client = ::hyper::Client::configure()
                         .connector(::hyper_tls::HttpsConnector::new(4, &handle).unwrap())
                         .build(&handle);
-                    // let cloned_dict = Dictionary {
-                    //     mappings: self.1.mappings.clone(),
-                    // };
                     println!("Self.1.mappings: {:?}", dict);
                     let uri = dict.resolve_callback(&res_url["callback_id"].as_str().unwrap())
                         .unwrap()
                         .parse()
                         .unwrap();
-                    //let uri = "https://script.google.com/macros/s/AKfycbzqs6D4QA8L2x2k9B3_UrgSU1Vcqj0icHiIs26G0IbTYaBNy8xW/exec".parse().unwrap();
                     let mut request = Request::new(Method::Post, uri);
                     request.set_body(Body::from(b));
                     {
                         let mut headers = request.headers_mut();
                         headers.set_raw("Content-Type", "application/x-www-form-urlencoded");
-                        headers.set_raw("Accept", "*/*");
-                        headers.set_raw("User-Agent", "Rust");
                     }
                     let work = client.request(request).and_then(|res| {
                         println!("Response: {}", res.status());
@@ -83,7 +81,7 @@ impl Service for SimpleRespond {
                     &handle.spawn(work.map_err(|_| ()));
 
                     // Continue with the server
-                    let body = "Your request has been received";
+                    let body = response_to_slack;
                     let len = body.len();
                     let body: ResponseStream = Box::new(hyper::Body::from(body));
                     Response::new()
@@ -145,18 +143,24 @@ impl Dictionary {
     }
 }
 
-pub fn start_server(addr: std::net::SocketAddr, dict_file: &Path) -> hyper::Result<()> {
+pub fn start_server(
+    addr: std::net::SocketAddr,
+    dict_file: &Path,
+    response_to_slack: &str,
+) -> hyper::Result<()> {
     let dictionary = Dictionary::new_from_file(dict_file).unwrap();
 
     let mut core = tokio_core::reactor::Core::new()?;
     let server_handle = core.handle();
     let client_handle = core.handle();
+    let response_to_slack = response_to_slack.to_string();
     let serve = Http::new().serve_addr_handle(&addr, &server_handle, move || {
         Ok(SimpleRespond(
             client_handle.clone(),
             Dictionary {
                 mappings: dictionary.mappings.clone(),
             },
+            response_to_slack.clone(),
         ))
     })?;
 
