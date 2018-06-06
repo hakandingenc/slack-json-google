@@ -8,8 +8,9 @@ extern crate url;
 use futures::{Stream, future::Future};
 use hyper::{Body, Chunk, Error, Method, StatusCode, header::ContentLength,
             server::{Request, Response, Service}};
-use serde_json::Value;
-use std::{collections::HashMap, fs::File, io::prelude::*, path::Path};
+use std::{collections::HashMap, fs::{File,OpenOptions}, io::prelude::*, path::Path};
+use serde_json::{Error as SerdeError, Value};
+use std::io::prelude::*;
 use url::form_urlencoded;
 
 use hyper::server::Http;
@@ -53,6 +54,7 @@ impl Service for SimpleRespond {
     fn call(&self, req: Request) -> Self::Future {
         let mut response = Response::new();
 
+
         match (req.method(), req.path()) {
             (&Method::Get, "/") => {
                 let body: ResponseStream = Box::new(hyper::Body::from(GET_RESPONSE));
@@ -74,15 +76,9 @@ impl Service for SimpleRespond {
                             .with_header(ContentLength(MISSING.len() as u64))
                             .with_body(body);
                     };
-                    // Use the client in some way
-                    //let client = Client::new(&handle);
                     let client = ::hyper::Client::configure()
                         .connector(::hyper_tls::HttpsConnector::new(4, &handle).unwrap())
                         .build(&handle);
-                    //let client = Client::configure().build(&self.0);
-                    //let mut req2 = Request::new(Method::Get, "localhost/".parse().unwrap());
-                    //req2.set_body("ABC");
-                    //let uri = "http://httpbin.org/ip".parse().unwrap();
                     let uri = "https://script.google.com/macros/s/AKfycbzqs6D4QA8L2x2k9B3_UrgSU1Vcqj0icHiIs26G0IbTYaBNy8xW/exec".parse().unwrap();
                     let mut request = Request::new(Method::Post, uri);
                     request.set_body(Body::from("payload=Hello%20world"));
@@ -122,14 +118,17 @@ impl Service for SimpleRespond {
     }
 }
 
-fn resolve_callback(id: &serde_json::Value) -> serde_json::Value {
-    let mut f = File::open("mappings.json").expect("file not found");
+fn resolve_callback(mut id: &serde_json::Value) -> serde_json::Value {
+    let mut mapfile = OpenOptions::new()
+        .read(true)
+        .append(true)
+        .create(true)
+        .open("mappings.json")
+        .expect("Mappings file IO error!");
 
-    let mut contents = String::new();
-    f.read_to_string(&mut contents)
-        .expect("something went wrong reading the file");
+    let json: Value = serde_json::from_reader(mapfile)
+        .expect("Couldn't read file into JSON Object!");
 
-    let json: Value = serde_json::from_str(&contents).unwrap();
     json[id.as_str().unwrap()].clone()
 }
 
@@ -140,10 +139,16 @@ pub struct Dictionary {
 
 impl Dictionary {
     pub fn new_from_file(path: &str) -> io::Result<Self> {
-        let mut f = File::open(path)?;
-        let mut contents = String::new();
-        f.read_to_string(&mut contents)?;
-        let mappings: HashMap<String, String> = serde_json::from_str(contents.as_ref())?;
+        let mut mapfile = OpenOptions::new()
+            .read(true)
+            .append(true)
+            .create(true)
+            .open(path)
+            .expect("Mapfile IO error!");
+
+        let mappings: HashMap<String, String> = serde_json::from_reader(mapfile)
+            .expect("Couldn't read file into JSON Object!");
+
         println!("{:?}", mappings);
         Ok(Dictionary { mappings })
     }
