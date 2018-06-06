@@ -35,19 +35,16 @@ impl Service for SimpleRespond {
     fn call(&self, req: Request) -> Self::Future {
         let mut response = Response::new();
 
-        match (req.method(), req.path()) {
-            (&Method::Get, "/") => {
-                let body: ResponseStream = Box::new(hyper::Body::from(GET_RESPONSE));
-                response.set_body(body);
-            }
-            (&Method::Post, "/") => {
+        match req.method() {
+            &Method::Post => {
                 let handle = self.0.clone();
                 let dict = self.1.clone();
                 return Box::new(req.body().concat2().map(move |b| {
                     let params = form_urlencoded::parse(b.as_ref())
                         .into_owned()
                         .collect::<HashMap<String, String>>();
-                    let res_url: Value = if let Some(n) = params.get("payload") {
+                    let url_encoded_payload = params.get("payload");
+                    let res_url: Value = if let Some(n) = url_encoded_payload {
                         serde_json::from_str(n).unwrap()
                     } else {
                         let body: ResponseStream = Box::new(hyper::Body::from(GET_RESPONSE));
@@ -70,7 +67,7 @@ impl Service for SimpleRespond {
                         .unwrap();
                     //let uri = "https://script.google.com/macros/s/AKfycbzqs6D4QA8L2x2k9B3_UrgSU1Vcqj0icHiIs26G0IbTYaBNy8xW/exec".parse().unwrap();
                     let mut request = Request::new(Method::Post, uri);
-                    request.set_body(Body::from("payload=Hello%20world"));
+                    request.set_body(Body::from(b));
                     {
                         let mut headers = request.headers_mut();
                         headers.set_raw("Content-Type", "application/x-www-form-urlencoded");
@@ -93,6 +90,10 @@ impl Service for SimpleRespond {
                         .with_header(ContentLength(len as u64))
                         .with_body(body)
                 }));
+            }
+            &Method::Get => {
+                let body: ResponseStream = Box::new(hyper::Body::from(GET_RESPONSE));
+                response.set_body(body);
             }
             _ => {
                 response.set_status(StatusCode::NotFound);
