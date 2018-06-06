@@ -8,11 +8,13 @@ extern crate url;
 use futures::{Stream, future::Future};
 use hyper::{Body, Chunk, Error, Method, StatusCode, header::ContentLength,
             server::{Request, Response, Service}};
-use serde_json::{Error as SerdeError, Value};
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::prelude::*;
+use serde_json::Value;
+use std::{collections::HashMap, fs::File, io::prelude::*, path::Path};
 use url::form_urlencoded;
+
+use hyper::server::Http;
+
+//use std::env;
 
 // For deriving serde macros
 extern crate serde;
@@ -148,4 +150,42 @@ impl Dictionary {
     pub fn resolve_callback(&self, id: &str) -> Option<&String> {
         self.mappings.get(id)
     }
+}
+
+pub fn start_server(addr: std::net::SocketAddr, dict_file: &Path) -> hyper::Result<()> {
+    //initialize_dictionary();
+
+    let mut core = tokio_core::reactor::Core::new()?;
+    let server_handle = core.handle();
+    let client_handle = core.handle();
+    let serve = Http::new().serve_addr_handle(&addr, &server_handle, move || {
+        Ok(SimpleRespond(client_handle.clone()))
+    })?;
+
+    println!(
+        "Listening on http://{} with 1 thread.",
+        serve.incoming_ref().local_addr()
+    );
+    let h2 = server_handle.clone();
+    server_handle.spawn(
+        serve
+            .for_each(move |conn| {
+                h2.spawn(
+                    conn.map(|_| ())
+                        .map_err(|err| println!("serve error: {:?}", err)),
+                );
+                Ok(())
+            })
+            .map_err(|_| ()),
+    );
+    core.run(futures::future::empty::<(), hyper::Error>())
+}
+
+fn print_carets() -> io::Result<()> {
+    print!(">>> ");
+    io::stdout().flush()
+}
+
+fn initialize_dictionary() {
+    unimplemented!()
 }
