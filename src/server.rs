@@ -1,3 +1,5 @@
+//! SERVER MODULE
+
 extern crate bus;
 extern crate futures;
 extern crate hyper;
@@ -25,6 +27,7 @@ const NUM_THREADS: usize = 4;
 
 type UrlTupleSender = Arc<Mutex<Bus<(String, Option<String>)>>>;
 
+/// SERVER STRUCT
 pub struct Server {
     core_handle: Handle,
     response_to_slack: String,
@@ -35,6 +38,7 @@ pub struct Server {
 type ResponseStream = Box<Stream<Item = Chunk, Error = Error>>;
 
 impl Server {
+    /// VERY NAYSU METHOD
     pub fn new(
         core_handle: Handle,
         response_to_slack: String,

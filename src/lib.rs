@@ -1,3 +1,18 @@
+#![deny(missing_docs)]
+
+//! rson is a **fast** and **concurrent** Slack notification router built on top of **hyper**.
+//!
+//! It makes adding apps and integrations on the fly trivial, providing a single URL for Slack to send POST requests to. rson then takes care of parsing incoming requests and determining where they should be routed to, be that Google App Scripts, 3rd Party Software, or other custom APIs.
+//!
+//! Getting started is as easy as:
+//!
+//! ```
+//!     let addr = "localhost:1337".parse().unwrap();
+//!     let mapfile = Path::new("mappings.json");
+//!     let slack_response = "{\"text\": \" ✅ Your request has been received!\"}";
+//!     start_server(addr, mapfile, slack_response).unwrap()
+//! ```
+
 extern crate bus;
 extern crate futures;
 extern crate hyper;
@@ -29,12 +44,24 @@ lazy_static! {
     static ref RE_COMMAND: Regex = Regex::new(REGEXPR).expect("Could not parse supplied regex!");
 }
 
+/// This enum represents a command that has been issued to
+/// the [HostMap](hostmap/struct.HostMap.html) struct.
 pub enum Command {
+    /// This variant represents the command to add a new mapping
+    /// to the [HostMap](hostmap/struct.HostMap.html) struct or to
+    /// update an existing one. The first field is the callback id, and
+    /// the second field is the corresponding url.
     Add(String, String),
+    /// This variant represents the command to remove an existing mapping
+    /// from the [HostMap](hostmap/struct.HostMap.html) struct. Its only
+    /// field is the callback id to be removed.
     Remove(String),
+    /// This variant represents the command to list (by pretty printing)
+    /// all mappings found in the [HostMap](hostmap/struct.HostMap.html) struct.
     List,
 }
 
+/// BEST FUNCTION EVER
 pub fn start_server(
     addr: std::net::SocketAddr,
     dict_file: &'static Path,

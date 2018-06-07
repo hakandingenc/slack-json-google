@@ -1,7 +1,8 @@
 [package]
 name = "rson"
 version = "0.1.0"
-authors = ["Mateusz Ryczek <mateusz@northwestern.edu>"]
+authors = ["Hakan Dingenc <hakan@u.northwestern.edu>",
+           "Mateusz Ryczek <mateusz@northwestern.edu>"]
 
 [dependencies]
 serde = { version = "1.0.62", features = ["rc"] }
@@ -11,7 +12,6 @@ hyper-tls = "0.1.3"
 futures = "0.1"
 tokio-core = "0.1"
 url = "1.7.0"
-pretty_env_logger = "0.2.3"
 regex = "1.0.0"
 lazy_static = "1.0.0"
 mime = "0.3.7"
