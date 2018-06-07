@@ -9,7 +9,6 @@ pub struct HostMap {
 impl HostMap {
     pub fn new_from_file(path: &Path) -> io::Result<Self> {
         let mapfile = File::open(path)?;
-
         let mappings: HashMap<String, String> = serde_json::from_reader(mapfile)?;
         Ok(HostMap { mappings })
     }
