@@ -1,4 +1,4 @@
-//! SERVER MODULE
+//! Main server module
 
 extern crate bus;
 extern crate futures;
@@ -36,7 +36,7 @@ const NUM_THREADS: usize = 4;
 
 type UrlTupleSender = Arc<Mutex<Bus<(String, Option<String>)>>>;
 
-/// SERVER STRUCT
+/// Server struct
 pub struct Server {
     core_handle: Handle,
     response_to_slack: String,
@@ -47,7 +47,7 @@ pub struct Server {
 type ResponseStream = Box<Stream<Item = Chunk, Error = Error>>;
 
 impl Server {
-    /// VERY NAYSU METHOD
+    /// Given required objects, initializes a new server struct
     pub fn new(
         core_handle: Handle,
         response_to_slack: String,

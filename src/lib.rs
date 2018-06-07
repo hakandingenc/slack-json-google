@@ -48,7 +48,7 @@ lazy_static! {
     static ref RE_COMMAND: Regex = Regex::new(REGEXPR).expect("Could not parse supplied regex!");
 }
 
-/// This enum represents a command that has been issued to
+/// This enum represents a command to be run on
 /// the [HostMap](hostmap/struct.HostMap.html) struct.
 pub enum Command {
     /// This variant represents the command to add a new mapping
@@ -65,7 +65,9 @@ pub enum Command {
     List,
 }
 
-/// BEST FUNCTION EVER
+/// Creates tokio Core, initializes server, and spawns 3 threads that
+/// loop over reading from `stdin()`, resolving callback ids, and
+/// running [HostMap](hostmap/struct.HostMap.html) commands.
 pub fn start_server(
     addr: std::net::SocketAddr,
     dict_file: &'static Path,
