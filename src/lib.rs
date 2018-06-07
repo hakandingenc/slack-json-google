@@ -22,7 +22,7 @@ use server::Server;
 use std::{thread, io::{self, BufReader, prelude::*}, path::Path,
           sync::{Arc, Mutex, mpsc::{self, Receiver, Sender}}};
 
-const REGEXPR: &str = r#"^(add|rm|ls)(?: "(\w+)")?(?: "([a-zA-Z0-9:/.]+)")?$"#;
+const REGEXPR: &str = r#"^(ls)|(add)(?: "(\w+)")(?: "([a-zA-Z0-9:/.]+)")|(rm)(?: "(\w+)")$"#;
 const NUM_OF_BUSREADER: usize = 10;
 
 lazy_static! {
@@ -55,15 +55,12 @@ pub fn start_server(
         ))
     })?;
 
-    println!(
-        "Listening on http://{} with 1 thread.",
-        serve.incoming_ref().local_addr()
-    );
-    let h2 = server_handle.clone();
+    println!("Listening on http://{}", serve.incoming_ref().local_addr());
+    let server_handle2 = server_handle.clone();
     server_handle.spawn(
         serve
             .for_each(move |conn| {
-                h2.spawn(
+                server_handle2.spawn(
                     conn.map(|_| ())
                         .map_err(|err| println!("serve error: {:?}", err)),
                 );
@@ -104,7 +101,7 @@ fn spawn_hostmap(
                 .unwrap()
                 .broadcast((callback_id, url));
         });
-
+        print_carets().unwrap();
         loop {
             if let Ok(new_command) = recv_new_line.recv() {
                 let mut hostmap = hostmap.lock().unwrap();
@@ -125,6 +122,7 @@ fn spawn_hostmap(
                         }
                     },
                 }
+                print_carets().unwrap();
             }
         }
     });
@@ -135,18 +133,26 @@ fn spawn_hostmap(
 fn match_and_send(new_line: &str, send_new_line: &Sender<Command>) {
     let re_try = RE_COMMAND.captures(new_line);
     match re_try {
-        Some(array) => match &array[1] {
-            "add" => {
-                send_new_line.send(Command::Add(array[2].to_string(), array[3].to_string()));
+        Some(array) => {
+            // Multiple nested `match`es because regex crate doesn't implement branch reset groups
+            match array.get(1) {
+                Some(_) => {
+                    send_new_line.send(Command::List);
+                }
+                None => match array.get(2) {
+                    Some(_) => {
+                        send_new_line
+                            .send(Command::Add(array[3].to_string(), array[4].to_string()));
+                    }
+                    None => match array.get(5) {
+                        Some(_) => {
+                            send_new_line.send(Command::Remove(array[6].to_string()));
+                        }
+                        None => unreachable!(),
+                    },
+                },
             }
-            "rm" => {
-                send_new_line.send(Command::Remove(array[2].to_string()));
-            }
-            "ls" => {
-                send_new_line.send(Command::List);
-            }
-            _ => unreachable!(),
-        },
+        }
         None => {
             println!("Command not recognized");
         }
