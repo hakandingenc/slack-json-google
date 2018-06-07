@@ -23,21 +23,23 @@ const PAYLOAD: &str = "payload";
 const CALLBACK_ID: &str = "callback_id";
 const NUM_THREADS: usize = 4;
 
+type UrlTupleSender = Arc<Mutex<Bus<(String, Option<String>)>>>;
+
 pub struct Server {
-    core_handle: tokio_core::reactor::Handle,
+    core_handle: Handle,
     response_to_slack: String,
     send_callback_id: Sender<String>,
-    send_url_bus: Arc<Mutex<Bus<(String, Option<String>)>>>,
+    send_url_bus: UrlTupleSender,
 }
 
 type ResponseStream = Box<Stream<Item = Chunk, Error = Error>>;
 
 impl Server {
     pub fn new(
-        core_handle: tokio_core::reactor::Handle,
+        core_handle: Handle,
         response_to_slack: String,
         send_callback_id: Sender<String>,
-        send_url_bus: Arc<Mutex<Bus<(String, Option<String>)>>>,
+        send_url_bus: UrlTupleSender,
     ) -> Self {
         Server {
             core_handle,
@@ -50,7 +52,7 @@ impl Server {
 
 impl Service for Server {
     type Request = Request;
-    type Error = hyper::Error;
+    type Error = Error;
     type Future = Box<Future<Item = Self::Response, Error = Self::Error>>;
     type Response = Response<ResponseStream>;
 
@@ -58,7 +60,7 @@ impl Service for Server {
         let mut response = Response::new();
 
         match req.method() {
-            &Method::Post => {
+            Method::Post => {
                 let handle = self.core_handle.clone();
                 let response_to_slack = self.response_to_slack.clone();
                 let send_callback_id = self.send_callback_id.clone();
@@ -83,7 +85,7 @@ impl Service for Server {
 
                     let recv_url = { send_url_bus.lock().unwrap().add_rx() };
                     let callback_id_str = parsed_payload[CALLBACK_ID].as_str().unwrap();
-                    let url = send_id_receive_url(send_callback_id, callback_id_str, recv_url);
+                    let url = send_id_receive_url(&send_callback_id, callback_id_str, recv_url);
 
                     let request = new_request(
                         Method::Post,
@@ -97,11 +99,11 @@ impl Service for Server {
                             .for_each(|chunk| io::stdout().write_all(&chunk).map_err(From::from))
                     });
 
-                    &handle.spawn(work.map_err(|_| ()));
+                    handle.spawn(work.map_err(|_| ()));
                     new_response(response_to_slack)
                 }));
             }
-            &Method::Get => {
+            Method::Get => {
                 let body: ResponseStream = Box::new(hyper::Body::from(GET_RESPONSE));
                 response.set_body(body);
             }
@@ -115,14 +117,14 @@ impl Service for Server {
 }
 
 fn send_id_receive_url(
-    send_callback_id: Sender<String>,
+    send_callback_id: &Sender<String>,
     callback_id_str: &str,
     mut recv_url: BusReader<(String, Option<String>)>,
 ) -> Uri {
     send_callback_id.send(callback_id_str.to_string());
     let mut url_option = None;
     while let Ok(id_url_tuple) = recv_url.recv() {
-        if { callback_id_str == id_url_tuple.0 } {
+        if callback_id_str == id_url_tuple.0 {
             url_option = id_url_tuple.1;
             break;
         }

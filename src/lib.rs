@@ -71,9 +71,9 @@ pub fn start_server(
     core.run(futures::future::empty::<(), hyper::Error>())
 }
 
-fn spawn_hostmap(
-    host_file: &'static Path,
-) -> (Sender<String>, Arc<Mutex<Bus<(String, Option<String>)>>>) {
+type SenderTuple = (Sender<String>, Arc<Mutex<Bus<(String, Option<String>)>>>);
+
+fn spawn_hostmap(host_file: &'static Path) -> SenderTuple {
     let (send_callback_id, recv_callback_id): (Sender<String>, Receiver<String>) = mpsc::channel();
     let send_url_bus = Arc::new(Mutex::new(Bus::new(NUM_OF_BUSREADER)));
     let send_url_bus_clone = send_url_bus.clone();
