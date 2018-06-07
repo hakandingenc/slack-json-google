@@ -23,8 +23,7 @@ use std::{thread, io::{self, BufReader, prelude::*}, path::Path,
 const REGEXPR: &str = r#"^(add|rm|ls)(?: "(\w+)")?(?: "([a-zA-Z0-9:/.]+)")?$"#;
 
 lazy_static! {
-    static ref RE_COMMAND: Regex =
-        Regex::new(REGEXPR).expect("Could not parse supplied regex!");
+    static ref RE_COMMAND: Regex = Regex::new(REGEXPR).expect("Could not parse supplied regex!");
 }
 
 pub enum Command {
@@ -33,7 +32,11 @@ pub enum Command {
     List,
 }
 
-pub fn start_server(addr: std::net::SocketAddr, dict_file: &'static Path, response_to_slack: &str) -> hyper::Result<()> {
+pub fn start_server(
+    addr: std::net::SocketAddr,
+    dict_file: &'static Path,
+    response_to_slack: &str,
+) -> hyper::Result<()> {
     let (send_callback_id, recv_url_mutex) = spawn_hostmap(dict_file);
 
     let mut core = tokio_core::reactor::Core::new()?;
@@ -68,7 +71,9 @@ pub fn start_server(addr: std::net::SocketAddr, dict_file: &'static Path, respon
     core.run(futures::future::empty::<(), hyper::Error>())
 }
 
-fn spawn_hostmap(host_file: &'static Path) -> (Sender<String>, Arc<Mutex<Receiver<Option<String>>>>) {
+fn spawn_hostmap(
+    host_file: &'static Path,
+) -> (Sender<String>, Arc<Mutex<Receiver<Option<String>>>>) {
     let (send_callback_id, recv_callback_id): (Sender<String>, Receiver<String>) = mpsc::channel();
     let (send_url, recv_url): (Sender<Option<String>>, Receiver<Option<String>>) = mpsc::channel();
     let recv_url_mutex = Arc::new(Mutex::new(recv_url));
@@ -78,12 +83,10 @@ fn spawn_hostmap(host_file: &'static Path) -> (Sender<String>, Arc<Mutex<Receive
         let (send_new_line, recv_new_line): (Sender<Command>, Receiver<Command>) = mpsc::channel();
 
         thread::spawn(move || {
-            BufReader::new(io::stdin())
-                .lines()
-                .for_each(|new_line| {
-                    let new_line = new_line.expect("Could not read line");
-                    match_and_send(&new_line, &send_new_line);
-                });
+            BufReader::new(io::stdin()).lines().for_each(|new_line| {
+                let new_line = new_line.expect("Could not read line");
+                match_and_send(&new_line, &send_new_line);
+            });
         });
 
         let mut hostmap = HostMap::new_from_file(host_file).unwrap();
@@ -121,20 +124,18 @@ fn spawn_hostmap(host_file: &'static Path) -> (Sender<String>, Arc<Mutex<Receive
 fn match_and_send(new_line: &str, send_new_line: &Sender<Command>) {
     let re_try = RE_COMMAND.captures(new_line);
     match re_try {
-        Some(array) => {
-            match &array[0] {
-                "add" => {
-                    send_new_line.send(Command::Add(array[1].to_string(), array[2].to_string()));
-                }
-                "rm" => {
-                    send_new_line.send(Command::Remove(array[1].to_string()));
-                }
-                "ls" => {
-                    send_new_line.send(Command::List);
-                }
-                _ => unreachable!(),
+        Some(array) => match &array[1] {
+            "add" => {
+                send_new_line.send(Command::Add(array[2].to_string(), array[3].to_string()));
             }
-        }
+            "rm" => {
+                send_new_line.send(Command::Remove(array[2].to_string()));
+            }
+            "ls" => {
+                send_new_line.send(Command::List);
+            }
+            _ => unreachable!(),
+        },
         None => {
             println!("Command not recognized");
         }
