@@ -5,9 +5,10 @@ extern crate serde;
 extern crate serde_json;
 extern crate tokio_core;
 extern crate url;
+extern crate mime;
 
 use futures::{Stream, future::Future};
-use hyper::{Body, Chunk, Error, Method, StatusCode, header::ContentLength,
+use hyper::{Body, Chunk, Error, Method, StatusCode, header::{ContentLength,ContentType},
             server::{Request, Response, Service}};
 use serde_json::Value;
 use std::{collections::HashMap, io::{self, prelude::*},
@@ -15,8 +16,8 @@ use std::{collections::HashMap, io::{self, prelude::*},
 use url::form_urlencoded;
 
 const GET_RESPONSE: &str = "This server expects POST requests";
-const MISSING: &str = "Missing field";
 const PAYLOAD: &str = "payload";
+const CALLBACK_ID : &str = "callback_id";
 const NUM_THREADS: usize = 4;
 
 pub struct Server {
@@ -60,21 +61,21 @@ impl Service for Server {
                 let send_callback_id = self.send_callback_id.clone();
                 let recv_url = self.recv_url.clone();
 
-                return Box::new(req.body().concat2().map(move |b| {
-                    let parameter = form_urlencoded::parse(b.as_ref())
+                return Box::new(req.body().concat2().map(move |assembled_body| {
+                    let parameter = form_urlencoded::parse(assembled_body.as_ref())
                         .into_owned()
                         .collect::<HashMap<String, String>>();
 
                     let url_encoded_payload = parameter.get(PAYLOAD);
 
                     let parsed_payload: Value = if let Some(n) = url_encoded_payload {
-                        serde_json::from_str(n).unwrap()
+                        serde_json::from_str(n).expect("Couldn't parse formurl into JSON")
                     } else {
                         let body: ResponseStream = Box::new(hyper::Body::from(GET_RESPONSE));
 
                         return Response::new()
                             .with_status(StatusCode::UnprocessableEntity)
-                            .with_header(ContentLength(MISSING.len() as u64))
+                            .with_header(ContentLength(GET_RESPONSE.len() as u64))
                             .with_body(body);
                     };
                     let client = ::hyper::Client::configure()
@@ -82,30 +83,32 @@ impl Service for Server {
                         .build(&handle);
 
                     send_callback_id
-                        .send(parsed_payload["callback_id"].as_str().unwrap().to_string());
+                        .send(parsed_payload[CALLBACK_ID].as_str().unwrap().to_string());
+
                     let uri = recv_url
                         .lock()
-                        .unwrap()
+                        .expect("Mutex poisoned")
                         .recv()
-                        .unwrap()
-                        .unwrap()
+                        .expect("Error communicating with hostmap thread")
+                        .expect("Requested callback_id has no mapping") //This should be a match, crashing b/c of nonexistent ID isn't optimal
                         .parse()
-                        .unwrap();
+                        .expect("Could not parse mapping into URL"); //This should also be a match, crashing server from bad URL isn't optimal
+
                     let mut request = Request::new(Method::Post, uri);
-                    request.set_body(Body::from(b));
+                    request.set_body(Body::from(assembled_body));
+
                     {
                         let headers = request.headers_mut();
-                        headers.set_raw("Content-Type", "application/x-www-form-urlencoded");
+                        headers.set(ContentType(mime::APPLICATION_WWW_FORM_URLENCODED));
                     }
-                    let work = client.request(request).and_then(|res| {
-                        println!("Response: {}", res.status());
 
+                    let work = client.request(request).and_then(|res| {
                         res.body()
                             .for_each(|chunk| io::stdout().write_all(&chunk).map_err(From::from))
                     });
+
                     &handle.spawn(work.map_err(|_| ()));
 
-                    // Continue with the server
                     let body = response_to_slack;
                     let len = body.len();
                     let body: ResponseStream = Box::new(hyper::Body::from(body));
