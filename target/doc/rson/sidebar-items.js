@@ -1,1 +1,0 @@
-initSidebarItems({"enum":[["Command","This enum represents a command to be run on the HostMap struct."]],"fn":[["start_server","Creates tokio Core, initializes server, and spawns 3 threads that loop over reading from `stdin()`, resolving callback ids, and running HostMap commands."]],"mod":[["hostmap","Callback id to url mappings"],["server","Main server module"]]});
