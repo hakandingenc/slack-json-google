@@ -1,7 +1,7 @@
-//! HOSTMAP MODULE
+//! This module
 
 extern crate serde_json;
-use std::{fmt, io, collections::HashMap, fs::File, path::Path};
+use std::{collections::HashMap, fmt, fs::File, io, path::Path};
 
 /// HOSTMAP STRUCT
 #[derive(Default, PartialEq, Eq, Clone)]

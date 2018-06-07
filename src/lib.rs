@@ -29,13 +29,17 @@ pub mod hostmap;
 pub mod server;
 
 use bus::Bus;
-use futures::{Stream, future::Future};
+use futures::{future::Future, Stream};
 use hostmap::HostMap;
 use hyper::server::Http;
 use regex::Regex;
 use server::Server;
-use std::{thread, io::{self, BufReader, prelude::*}, path::Path,
-          sync::{Arc, Mutex, mpsc::{self, Receiver, Sender}}};
+use std::{io::{self, prelude::*, BufReader},
+          path::Path,
+          sync::{mpsc::{self, Receiver, Sender},
+                 Arc,
+                 Mutex},
+          thread};
 
 const REGEXPR: &str = r#"^(ls)|(add)(?: "(\w+)")(?: "([a-zA-Z0-9:/.]+)")|(rm)(?: "(\w+)")$"#;
 const NUM_OF_BUSREADER: usize = 10;

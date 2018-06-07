@@ -11,12 +11,21 @@ extern crate tokio_core;
 extern crate url;
 
 use bus::{Bus, BusReader};
-use futures::{Stream, future::Future};
-use hyper::{Body, Chunk, Error, Method, StatusCode, Uri, client::{Client, HttpConnector},
-            header::{ContentLength, ContentType}, server::{Request, Response, Service}};
+use futures::{future::Future, Stream};
+use hyper::{client::{Client, HttpConnector},
+            header::{ContentLength, ContentType},
+            server::{Request, Response, Service},
+            Body,
+            Chunk,
+            Error,
+            Method,
+            StatusCode,
+            Uri};
 use hyper_tls::HttpsConnector;
 use serde_json::Value;
-use std::{collections::HashMap, io::{self, prelude::*}, sync::{Arc, Mutex, mpsc::Sender}};
+use std::{collections::HashMap,
+          io::{self, prelude::*},
+          sync::{mpsc::Sender, Arc, Mutex}};
 use tokio_core::reactor::Handle;
 use url::form_urlencoded;
 
