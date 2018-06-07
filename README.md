@@ -16,7 +16,7 @@ Getting started is as easy as:
     }
 ```
 
-##Mappings
+## Mappings
 
 The `mappings.json` file is used to map a `callback_id` to a `URL`, which the server then uses to forward the Slack POST request to. An example of the structure is as follows:
 
