@@ -1,4 +1,4 @@
-# slack-json-google
+# RSON
 
 rson is a **fast** and **concurrent** Slack notification router built on top of **hyper**.
 
@@ -14,4 +14,18 @@ Getting started is as easy as:
         Ok(_) => {}
         Err(error) => panic!(error),
     }
+```
+
+##Mappings
+
+The `mappings.json` file is used to map a `callback_id` to a `URL`, which the server then uses to forward the Slack POST request to. An example of the structure is as follows:
+
+```
+{
+  "some_id": "https://script.google.com/macros/s/****/exec",
+  "nyan" : "http://www.nyan.cat/",
+  "debug" : "http://httpbin.org/post"
+  ...etc
+}
+
 ```
